@@ -97,15 +97,6 @@ def main():
                 else:
                     print(f'Failed: {url}')
 
-        # If any tile downloaded in this zoom level, create a marker file so frontend can detect tiles
-        if downloaded_any:
-            marker = output / '.tiles_present'
-            try:
-                marker.parent.mkdir(parents=True, exist_ok=True)
-                marker.write_text('ok')
-            except Exception:
-                pass
-
     # Write metadata (bbox, zoom range, suggested center and zoom)
     try:
         meta = {
