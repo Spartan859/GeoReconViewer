@@ -1,89 +1,97 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Offline Map</title>
-  <!-- Use local leaflet files for fully offline operation -->
-  <link rel="stylesheet" href="./leaflet/leaflet.css" />
-  <style>html,body,#map{height:100%;margin:0;padding:0}</style>
-</head>
-<body>
-  <div id="map"></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline Map</title>
+    <!-- Use local leaflet files for fully offline operation -->
+    <link rel="stylesheet" href="./leaflet/leaflet.css" />
+    <style>
+      html,
+      body,
+      #map {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
 
-  <script src="./leaflet/leaflet.js"></script>
-  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
-  <script>
-    // Initialize map using local resources. Supports either a single local image overlay (assets/map.jpg)
-    // or a local tiles folder at assets/tiles/{z}/{x}/{y}.png. If neither exists, the map will be empty.
+    <script src="./leaflet/leaflet.js"></script>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script>
+      // Initialize map using local resources. Supports either a single local image overlay (assets/map.jpg)
+      // or a local tiles folder at assets/tiles/{z}/{x}/{y}.png. If neither exists, the map will be empty.
 
-    function fileExists(url, callback) {
-      // Try to fetch the resource; for local files through Qt WebEngine this should work.
-      fetch(url, { method: 'HEAD' }).then(function(resp){
-        callback(resp.ok);
-      }).catch(function(){ callback(false); });
-    }
+      function fileExists(url, callback) {
+        // Try to fetch the resource; for local files through Qt WebEngine this should work.
+        fetch(url, { method: "HEAD" })
+          .then(function (resp) {
+            callback(resp.ok);
+          })
+          .catch(function () {
+            callback(false);
+          });
+      }
 
-    (function() {
-      let map = L.map('map').setView([0,0], 2);
-      let marker = null;
+      (function () {
+        let map = L.map("map").setView([0, 0], 2);
+        let marker = null;
 
-      const markerPath = './tiles/.tiles_present';
-      const imagePath = './map.jpg';
-
-      fileExists(markerPath, function(tilesFound) {
-        if (tilesFound) {
-          // Use local tiles. Build an absolute file:// URL base so Leaflet resolves placeholders correctly.
-          // Build tile template by concatenating the page directory with the tiles path
-          const pageDir = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
-          // const tileTemplate = pageDir + 'tiles/{z}/{x}/{y}.png';
-          const tileTemplate = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-          L.tileLayer(tileTemplate, { maxZoom: 19, tms: false, noWrap: false }).addTo(map);
-          console.log('Using local tiles at', tileTemplate);
-          // Try to read metadata to center the map correctly
-          fetch('tiles/metadata.json').then(function(resp){
+        // Use local tiles. Build an absolute file:// URL base so Leaflet resolves placeholders correctly.
+        // Build tile template by concatenating the page directory with the tiles path
+        const pageDir = window.location.href.substring(
+          0,
+          window.location.href.lastIndexOf("/") + 1
+        );
+        // const tileTemplate = pageDir + 'tiles/{z}/{x}/{y}.png';
+        const tileTemplate = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+        L.tileLayer(tileTemplate, {
+          maxZoom: 19,
+          tms: false,
+          noWrap: false,
+        }).addTo(map);
+        console.log("Using local tiles at", tileTemplate);
+        // Try to read metadata to center the map correctly
+        fetch("tiles/metadata.json")
+          .then(function (resp) {
             if (!resp.ok) return null;
             return resp.json();
-          }).then(function(meta){
+          })
+          .then(function (meta) {
             if (!meta) return;
             if (meta.center && meta.suggested_zoom) {
-              map.setView([meta.center[0], meta.center[1]], meta.suggested_zoom);
+              map.setView(
+                [meta.center[0], meta.center[1]],
+                meta.suggested_zoom
+              );
             }
-          }).catch(function(){ /* ignore */ });
-        } else {
-          fileExists(imagePath, function(imgFound) {
-            if (imgFound) {
-              // Show single image overlay covering world (user should adjust bounds for correct geo registration)
-              const bounds = [[-90, -180],[90, 180]]; // full-world as default; override in future for correct placement
-              L.imageOverlay(imagePath, bounds).addTo(map);
-              map.fitBounds(bounds);
-              console.log('Using local image overlay at ./map.jpg');
-            } else {
-              console.warn('No local tiles or image found. Map will be empty. Place tiles in ./assets/tiles or a map.jpg in ./assets.');
-            }
+          })
+          .catch(function (e) {
+            console.error("Error fetching metadata:", e);
           });
-        }
 
-        new QWebChannel(qt.webChannelTransport, function(channel) {
+        new QWebChannel(qt.webChannelTransport, function (channel) {
           window.pyBridge = channel.objects.pyBridge;
 
           // Provide a global JS function that Python can call via runJavaScript
-          window.jsHighlight = function(lat, lon) {
+          window.jsHighlight = function (lat, lon) {
             if (marker) map.removeLayer(marker);
             marker = L.marker([lat, lon]).addTo(map);
             map.setView([lat, lon], 12);
           };
         });
 
-        map.on('click', function(e) {
+        map.on("click", function (e) {
           const lat = e.latlng.lat;
           const lon = e.latlng.lng;
           if (window.pyBridge && window.pyBridge.fromJs_click) {
             window.pyBridge.fromJs_click(lat, lon);
           }
         });
-      });
-    })();
-  </script>
-</body>
+      })();
+    </script>
+  </body>
 </html>
