@@ -1,0 +1,6 @@
+PySide6
+requests
+pyqtgraph
+numpy
+PyOpenGL
+PyOpenGL_accelerate
